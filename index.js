@@ -1,5 +1,7 @@
 'use strict';
 
+// Grid navigation simulatation
+
 const { stdout } = process,
 	{ fork } = require('child_process'),
 	{ readFileSync } = require('fs'),

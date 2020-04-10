@@ -1,5 +1,25 @@
 'use strict';
 
+// **stdin**
+// Grid width (UInt16LE), 
+// Grid height (UInt16LE), 
+// Start X (UInt16LE), 
+// Start Y (UInt16LE), 
+// ...commands
+
+// **stdout**
+// X (Int16LE)
+// Y (Int16LE)
+
+// Commands (UInt8):
+// 1: 1 step forward
+// 2: 1 step Back
+// 3: Turn right
+// 4: Turn left
+// 0: End
+
+// If borders were crossed X=-1 and Y=-1 are returned.
+
 const stream = require('stream'),
 	{ Transform } = stream,
 	pipeline = require('util')
@@ -36,17 +56,23 @@ class Simulate extends Transform {
 	}
 
 	_transform({ width, height, x, y, commands }, enc, cb) {
-		const sim = new Sim(width, height, x, y, 0);
+		const fail = [-1, -1];
 
-		cb(null,
-			x < width 
-			&& y < height 
-			&& x >= 0 
-			&& y >= 0
-			&& commands.every(sim.op.bind(sim))
-			? [sim.x, sim.y]
-			: [-1, -1]
-		);
+		try {
+			const sim = new Sim(width, height, x, y, 0);
+
+			cb(null,
+				x < width 
+				&& y < height 
+				&& x >= 0 
+				&& y >= 0
+				&& commands.every(sim.op.bind(sim))
+				? [sim.x, sim.y]
+				: fail
+			);
+		} catch (e) {
+			cb(null, fail);
+		}
 	}		
 }
 
@@ -68,6 +94,10 @@ class Sim {
 		Object.assign(this, {
 			width, height, x, y, orientation
 		});
+
+		if (!this.test()) {
+			throw Error('Invalid position');
+		}
 	}
 
 	op(com) { 
