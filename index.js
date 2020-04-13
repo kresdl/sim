@@ -14,21 +14,18 @@ const { stdout } = process,
 		.trim()
 		.split(/\s+/)
 		.map(Number),
+
+	buf = Buffer.alloc(user.length + 4);
 	
-	header = user.slice(0, 4),
-	commands = user.slice(4),
+for (let i = 0; i < 4; i++) {
+	buf.writeUInt16LE(user[i], 2 * i);
+}
 
-	data = Buffer.concat([
-		header.reduce((buf, e, i) => {
-			buf.writeUInt16LE(e, i << 1);
-			return buf;
-		}, Buffer.alloc(8)),
+buf.writeUInt8(user[4], 8);
 
-		commands.reduce((buf, e, i) => {
-			buf.writeUInt8(e, i);
-			return buf;
-		}, Buffer.alloc(commands.length))
-	]);
+for (let i = 0; i < user.length - 5; i++) {
+	buf.writeUInt8(user[i + 5], i + 9);
+}
 
 sim.stdout.on('data', xy => {
 	const x = xy.readInt16LE(),
@@ -37,4 +34,4 @@ sim.stdout.on('data', xy => {
 	process.exit();
 });
 
-sim.stdin.write(data);
+sim.stdin.write(buf);

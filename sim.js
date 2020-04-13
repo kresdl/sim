@@ -1,24 +1,34 @@
 'use strict';
 
-// **stdin**
+// *** stdin ***
+//
 // Grid width (UInt16LE), 
 // Grid height (UInt16LE), 
 // Start X (UInt16LE), 
 // Start Y (UInt16LE), 
-// ...commands
-
-// **stdout**
-// X (Int16LE)
+// Start orientation (UInt8), 
+// ...commands (UInt8)
+//
+// *** stdout ***
+//
+// X (Int16LE), 
 // Y (Int16LE)
-
-// Commands (UInt8):
-// 1: 1 step forward
-// 2: 1 step Back
-// 3: Turn right
-// 4: Turn left
-// 0: End
-
+//
 // If borders were crossed X=-1 and Y=-1 are returned.
+//
+// Commands:
+//
+// 1: 1 step forward
+// 2: 1 step back
+// 3: 90° right turn
+// 4: 90° left turn
+//
+// Orientation:
+//
+// 1: North
+// 2: East
+// 3: South
+// 4: West
 
 const stream = require('stream'),
 	{ Transform } = stream,
@@ -32,18 +42,20 @@ class Parse extends Transform {
 
 	_transform(buf, enc, cb) {
 		const { length } = buf,
-			headerSize = 4 << 1;
-	
-		if (length <= headerSize || buf.readUInt8(length - 1))
-			return cb(Error('Invalid input format'));
+			headerSize = 9;
+
+		if (length < headerSize)
+			return cb(Error('Invalid input'));
 
 		const [width, height, x, y] = [...Array(4)]
-			.map((e, i) => buf.readUInt16LE(i << 1)),
+			.map((e, i) => buf.readUInt16LE(2 * i)),
 
-			commands = [...Array(length - headerSize - 1)]
+			orientation = buf.readUInt8(8),
+
+			commands = [...Array(length - headerSize)]
 				.map((e, i) => buf.readUInt8(headerSize + i));
-		
-		cb(null, { width, height, x, y, commands });
+
+		cb(null, { width, height, x, y, orientation, commands });
 	}
 }
 
@@ -55,11 +67,11 @@ class Simulate extends Transform {
 		});
 	}
 
-	_transform({ width, height, x, y, commands }, enc, cb) {
+	_transform({ width, height, x, y, orientation, commands }, enc, cb) {
 		const fail = [-1, -1];
 
 		try {
-			const sim = new Sim(width, height, x, y, 0);
+			const sim = new Sim(width, height, x, y, orientation);
 
 			cb(null,
 				x < width 
@@ -73,7 +85,7 @@ class Simulate extends Transform {
 		} catch (e) {
 			cb(null, fail);
 		}
-	}		
+	}
 }
 
 class Serialize extends Transform {
@@ -86,13 +98,14 @@ class Serialize extends Transform {
 		buf.writeInt16LE(x);
 		buf.writeInt16LE(y, 2);
 		cb(null, buf);	
-	}		
+	}
 }
 
 class Sim {
 	constructor(width, height, x, y, orientation) {
 		Object.assign(this, {
-			width, height, x, y, orientation
+			width, height, x, y, 
+			orientation: (orientation - 1) % 4
 		});
 
 		if (!this.test()) {
@@ -129,8 +142,7 @@ class Sim {
 	}
 
 	turn(dir) {
-		const t = this.orientation + dir;
-		this.orientation = t < 0 ? 3 : t % 4;
+		this.orientation = (4 + this.orientation + dir) % 4;
 		return true;
 	}
 }
@@ -142,4 +154,3 @@ const { stdin, stdout, stderr } = process,
 
 pipeline(stdin, parse, simulate, serialize, stdout)
 	.catch(e => stderr.write(e.stack));
-	
