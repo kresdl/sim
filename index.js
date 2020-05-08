@@ -30,7 +30,7 @@ for (let i = 0; i < user.length - 5; i++) {
 sim.stdout.on('data', xy => {
 	const x = xy.readInt16LE(),
 		y = xy.readInt16LE(2);
-	stdout.write(`x: ${x}\ny: ${y}`);
+	stdout.write(`x: ${x}\ny: ${y}\n`);
 	process.exit();
 });
 
